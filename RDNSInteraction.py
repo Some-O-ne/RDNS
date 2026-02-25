@@ -3,7 +3,7 @@ import tomlkit,os,atexit,time,threading
 from nacl.signing import SigningKey
 from collections import Counter
 from DNSServer import Server
-from netutils import syncDB
+from netutils import syncDB,sendRequest
 
 import RNS
 
@@ -21,6 +21,8 @@ def config_init():
 
     if "peers" not in config or type(config["peers"]) is not tomlkit.items.Array:
         config["peers"] = []
+    else:
+        config["peers"] = list(config["peers"])
 
     if config["peers"] == []: 
         RNS.log("This node is not connected to a RDNS network. Serving in isolated mode, and waiting for RDNS_READY announce")
@@ -51,7 +53,6 @@ def get_voting(target):
         while len(voting["votes"]) < (len(config["peers"])+1)*config["CONSENSUS"]:
             time.sleep(1)
 
-        print(voting)
         voting_result = Counter(voting["votes"].values()).most_common(1)[0]
 
         if voting_result[1] < (len(config["peers"])+1)*config["CONSENSUS"]:
@@ -131,6 +132,8 @@ def RDNS_INIT(destination_hash):
     voting = get_voting(destination_hash)
     threading.Thread(target=prompt_vote_response,args=(voting,)).start()
 
+    return b'Acknowledged'
+
 
 def at_exit():
     global config
@@ -150,10 +153,11 @@ class AnnounceHandler:
         self.aspect_filter = None
         self.connectingToRDNS = False
     def received_announce(self, destination_hash, announced_identity, app_data):
-        
+
         if app_data != b"RDNS_READY":
             return
 
+        RNS.log(f"Got announce from {RNS.prettyhexrep(destination_hash)} with {app_data}")
         global config
         if "peers" in config and config["peers"] != []: # connected, no need to reconnect
             return
@@ -164,8 +168,9 @@ class AnnounceHandler:
 
         response = sendRequest(destination_hash,"RDNS_GET_PEERS",None)
 
-        if len(response)%16 != 0:
+        if response == None or len(response)%16 != 0:
             RNS.log("Peers list is corrupted, aborting this server")
+            self.connectingToRDNS = False
             return
 
         if destination_hash not in response:
@@ -174,6 +179,7 @@ class AnnounceHandler:
             RNS.log("Its weird that the server included themselves in the peer list, RDNS specification says against this...")
             response = input("Abandon this server? (Y/n)")
             if response.lower() in ["","y","yes"]:
+                self.connectingToRDNS = False
                 return
 
         

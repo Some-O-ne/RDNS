@@ -18,14 +18,16 @@ def establish_link(server_destination:RNS.Destination):
         nonlocal server_link
         server_link = link
     def link_closed(_):
+
         nonlocal should_quit
         should_quit = True
 
     link.set_link_established_callback(established_link)
     link.set_link_closed_callback(link_closed)
 
-    if not should_quit and not server_link:
+    while (not should_quit) and (not server_link):
         time.sleep(0.1)
+
     return server_link
 
 def request(server_link:RNS.Link,path:str,data=None):
@@ -106,6 +108,7 @@ def client(destination_hexhash, configpath):
     response = request(server_link,"RDNS_QUERY",b"iso.world")
     print(response)
     client_loop(server_link)
+
 
 def client_loop(server_link):
 

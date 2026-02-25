@@ -1,5 +1,7 @@
-import RNS,hashlib
+import RNS,hashlib,time
 from collections import Counter
+from ServerIdentity import getIdentity
+
 def establish_link(server_destination:RNS.Destination):
     link = RNS.Link(server_destination)
 
@@ -7,9 +9,9 @@ def establish_link(server_destination:RNS.Destination):
 
     should_quit = False
 
-    def established_link(link):
+    def established_link(_link):
         nonlocal server_link
-        server_link = link
+        server_link = _link
     def link_closed(_):
         nonlocal should_quit
         should_quit = True
@@ -17,8 +19,12 @@ def establish_link(server_destination:RNS.Destination):
     link.set_link_established_callback(established_link)
     link.set_link_closed_callback(link_closed)
 
-    if not should_quit and not server_link:
+    while (not should_quit) and (not server_link):
         time.sleep(0.1)
+    
+    if server_link:
+        server_link.identify(getIdentity())
+
     return server_link,link
 
 def request(server_link:RNS.Link,path:str,data=None):
@@ -34,14 +40,15 @@ def request(server_link:RNS.Link,path:str,data=None):
         should_quit = True
 
     server_link.request(
-        path,
-        data = data,
+        "RDNS_SERVER",
+        data = path.encode()+(data or b""),
         response_callback = got_response,
         failed_callback = request_failed
     )
 
     if not should_quit and not response:
         time.sleep(0.1)
+
     return response
 
 def sendRequest(destination_hash,path,data=None):
@@ -59,14 +66,19 @@ def sendRequest(destination_hash,path,data=None):
         server_identity,
         RNS.Destination.OUT,
         RNS.Destination.SINGLE,
-        APP_NAME,
-        "RDNS"
+        "RDNS_SERVER",
+        "RDNS_SERVER"
     )
     server_link,link = establish_link(server_destination)
 
-    while not server_link:
-        RNS.log("Couldn't connect to the server, retrying...")
+    attempt = 1
+    while not server_link and attempt < 10:
+        RNS.log("Couldn't connect to the server, retrying... ("+str(attempt)+"/10)")
         server_link,link = establish_link(server_destination)
+        attempt += 1
+
+    if not server_link:
+        return None
 
     response = request(server_link,path,data)
     link.teardown()
@@ -102,7 +114,7 @@ def syncDB(peers,consensus):
             continue
 
         table = sendRequest(peer,"RDNS_GET_TABLE")
-        if hashlib.sha256(table).digest() != most_common_hash:
+        if not table or hashlib.sha256(table).digest() != most_common_hash:
             RNS.log(f"{RNS.prettyhexrep(peer)} sent us a corrupted or forged dns table. either way, skipping them")
             continue
         

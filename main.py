@@ -1,20 +1,18 @@
 
-import os,atexit,RNS,time
+import os,RNS,time
 from DNSServer import Server
 from RDNSInteraction import AnnounceHandler,get_peers,RDNS_INIT,RDNS_VOTE
+from ServerIdentity import getIdentity
 
 APP_NAME = "RDNS_SERVER"
 DNServer = Server()
-
-IDENTITY_FILE_NAME = "identity"
-identity = None
 
 ANNOUNCE_INTERVAL = 5*60
 
 
 def add_destination(path,handler):
     dest = RNS.Destination(
-        identity,
+        getIdentity(),
         RNS.Destination.IN,
         RNS.Destination.SINGLE,
         APP_NAME,
@@ -25,7 +23,10 @@ def add_destination(path,handler):
     return dest
 
 def request_handle(path, data, request_id, link_id, remote_identity, requested_at):
-    RNS.log(f"Received request: {data} from {remote_identity} " )
+    destination_hash = None
+    if remote_identity:
+        destination_hash = RNS.Destination.hash(remote_identity,"RDNS_SERVER","RDNS_SERVER")
+    RNS.log(f"Received request: {data} from {destination_hash}" )
     if data.startswith(b"RDNS_QUERY"):
         return query_handler(data=data[len("RDNS_QUERY"):])
     elif data.startswith(b"RDNS_GET_PEERS"):
@@ -34,10 +35,10 @@ def request_handle(path, data, request_id, link_id, remote_identity, requested_a
         return DNServer.get_db_hash()
     elif data.startswith(b"RDNS_GET_TABLE"):
         return DNServer.get_db()
-    elif data.startswith(b"RDNS_INIT"):
-        return RDNS_INIT(remote_identity)
-    elif data.startswith(b"RDNS_VOTE"):
-        return RDNS_VOTE(remote_identity,data[len("RDNS_VOTE"):])
+    elif data.startswith(b"RDNS_INIT") and destination_hash != None:
+        return RDNS_INIT(destination_hash)
+    elif data.startswith(b"RDNS_VOTE") and destination_hash != None:
+        return RDNS_VOTE(destination_hash)
 
 def query_handler(data):
     try:
@@ -49,23 +50,9 @@ def query_handler(data):
         return f"Failure: {e} "
 
 def program_setup():
-    global identity
-
-    if os.path.isfile(IDENTITY_FILE_NAME):
-        try: identity = RNS.Identity.from_file(os.path.abspath(IDENTITY_FILE_NAME))
-        except Exception as e: RNS.log(e)
 
     reticulum = RNS.Reticulum()
 
-    if not identity:
-        identity = RNS.Identity()
-
-    # add_destination("RDNS_QUERY",      query_handler)
-    # add_destination("RDNS_GET_PEERS", lambda path, data, request_id, link_id, remote_identity, requested_at: b"".join(get_peers()))
-    # add_destination("RDNS_GET_HASH",  lambda path, data, request_id, link_id, remote_identity, requested_at: DNServer.get_db_hash())
-    # add_destination("RDNS_GET_TABLE", lambda path, data, request_id, link_id, remote_identity, requested_at: DNServer.get_db())
-    # add_destination("RDNS_INIT",      lambda path, data, request_id, link_id, remote_identity, requested_at: RDNS_INIT(remote_identity))
-    # add_destination("RDNS_VOTE",      lambda path, data, request_id, link_id, remote_identity, requested_at: RDNS_VOTE(remote_identity,data))
     RNS.Transport.register_announce_handler(AnnounceHandler())
 
     dest = add_destination("RDNS_SERVER",request_handle)
@@ -84,11 +71,3 @@ def announceLoop(dest):
 
 if __name__ == "__main__":
     program_setup()
-
-
-@atexit.register
-def at_exit():
-    global identity
-    if not os.path.isfile(IDENTITY_FILE_NAME):
-        RNS.log("Saving identity to disk...")
-        RNS.log(identity.to_file(os.path.abspath(IDENTITY_FILE_NAME)))
