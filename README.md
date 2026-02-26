@@ -7,14 +7,12 @@ This repository is a barebones implementation of a RDNS node.
 <h2>Installation and Usage</h2>
 
 <ol>
-  <li>Clone this repository with <code>git clone https://github.com/Some-O-ne/RDNS</code>
-    And navigate to it with <code>cd RDNS</code>
+  <li>Clone this repository with <code>git clone https://github.com/Some-O-ne/RDNS</code> (you must have Python installed for this project), and <a href="https://docs.python.org/3/tutorial/venv.html#creating-virtual-environments">create a virtual environment</a> for it (uv can also be used).
   </li>
   <li>
-    Assuming that you have Python installed, install required packages with <code>pip install -r requirements.txt</code>
-    Additionally, if you're on Arch Linux, these packages are avaliable on the AUR: <code>python-pynacl python-tomlkit python-rns</code>   
+    Activate the <a href="https://docs.python.org/3/tutorial/venv.html#creating-virtual-environments">virtual environment</a>, and install the required packages with <code>pip install -r requirements.txt</code>.
   </li>
   <li>
-    You're all set! run a RDNS Node with <code>python main.py</code>
+    You're all set! You can run a RDNS Node with <code>python main.py</code>.
   </li>
 </ol>
