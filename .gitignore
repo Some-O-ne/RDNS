@@ -2,3 +2,4 @@ config.toml
 DNS.db
 __pycache__
 identity
+test.py

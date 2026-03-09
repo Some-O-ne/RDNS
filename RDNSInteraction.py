@@ -168,7 +168,7 @@ class AnnounceHandler:
 
         response = sendRequest(destination_hash,"RDNS_GET_PEERS",None)
 
-        if response == None or len(response)%16 != 0:
+        if response != b"RDNS_EMPTY" and len(response)%16 != 0:
             RNS.log("Peers list is corrupted, aborting this server")
             self.connectingToRDNS = False
             return

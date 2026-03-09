@@ -3,7 +3,6 @@ import os,RNS,time
 from DNSServer import Server
 from RDNSInteraction import AnnounceHandler,get_peers,RDNS_INIT,RDNS_VOTE
 from ServerIdentity import getIdentity
-
 APP_NAME = "RDNS_SERVER"
 DNServer = Server()
 
@@ -30,6 +29,8 @@ def request_handle(path, data, request_id, link_id, remote_identity, requested_a
     if data.startswith(b"RDNS_QUERY"):
         return query_handler(data=data[len("RDNS_QUERY"):])
     elif data.startswith(b"RDNS_GET_PEERS"):
+        if get_peers() == []:
+            return b"RDNS_EMPTY"
         return b"".join(get_peers())
     elif data.startswith(b"RDNS_GET_HASH"):
         return DNServer.get_db_hash()
